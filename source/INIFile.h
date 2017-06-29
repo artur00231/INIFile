@@ -15,29 +15,37 @@ public:
 	INIFile();
 	~INIFile();
 
-	bool read(const std::string& name);
-	void set_section(const std::string&);
-	bool good() const;
-	void clear();
+	bool read(const std::string& name); // read file
+	void set_section(const std::string&); // set current section
+	bool good() const; // is INIFile ready?
+	void clear(); // claer all INIFile data
 
+
+	// get bool/int/long long/double/const std::string& from INIFile
 	template<typename T>
 	inline T get(const std::string&, const std::string&) const;
 
 	template<typename T>
 	inline T get(const std::string&) const;
 
+
+	// set bool/int/long long/double/const std::string& to INIFile
 	template<typename T>
 	inline void set(const std::string&, const std::string&, const T&);
 
 	template<typename T>
 	inline void set(const std::string&, const T&);
 
+
+	// change existing bool/int/long long/double/const std::string& in INIFile
 	template<typename T>
 	inline bool change(const std::string&, const std::string&, const T&);
 
 	template<typename T>
 	inline bool change(const std::string&, const T&);
 
+
+	// write to file
 	bool write();
 	bool write(std::string);
 
