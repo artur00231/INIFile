@@ -1,2 +1,2 @@
 # INIFile
-Simple c++ .ini reader
+Simple c++ ini file reader
