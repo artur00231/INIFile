@@ -22,6 +22,7 @@ public:
 
 
 	// get bool/int/long long/double/const std::string& from INIFile
+	// throw out_of_range if value don't exist
 	template<typename T>
 	inline T get(const std::string&, const std::string&) const;
 
@@ -72,36 +73,24 @@ inline T INIFile::get(const std::string&, const std::string&) const
 template<>
 inline int INIFile::get(const std::string& section, const std::string& property) const
 {
-	if (!exist(section, property))
-		throw std::out_of_range {"Data is not accessible"};
-
 	return atoi(_ini_data.at(section).at(property).c_str());
 }
 
 template<>
 inline double INIFile::get(const std::string& section, const std::string& property) const
 {
-	if (!exist(section, property))
-		throw std::out_of_range {"Data is not accessible"};
-
 	return atof(_ini_data.at(section).at(property).c_str());
 }
 
 template<>
 inline long long INIFile::get(const std::string& section, const std::string& property) const
 {
-	if (!exist(section, property))
-		throw std::out_of_range {"Data is not accessible"};
-
 	return atoll(_ini_data.at(section).at(property).c_str());
 }
 
 template<>
 inline bool INIFile::get(const std::string& section, const std::string& property) const
 {
-	if (!exist(section, property))
-		throw std::out_of_range {"Data is not accessible"};
-
 	std::string val = _ini_data.at(section).at(property);
 
 	if (val == "1" || val == "true" || val == "True") return true;
@@ -113,9 +102,6 @@ inline bool INIFile::get(const std::string& section, const std::string& property
 template<>
 inline const std::string& INIFile::get(const std::string& section, const std::string& property) const
 {
-	if (!exist(section, property))
-		throw std::out_of_range {"Data is not accessible"};
-
 	return _ini_data.at(section).at(property);
 }
 
