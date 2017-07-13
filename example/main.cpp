@@ -4,7 +4,6 @@
 
 int main()
 {
-	using string = const std::string&;
 
 	INIFile ini;
 
@@ -15,7 +14,7 @@ int main()
 	try {
 
 		std::cout << "data::y " << ini.get<int>("data", "y") << std::endl;
-		std::cout << "info::ver " << ini.get<const std::string&>("info", "ver") << std::endl;
+		std::cout << "info::ver " << ini.get<INIFile::string>("info", "ver") << std::endl; // INIFile::string == const std::string&
 		std::cout << "sec::ban " << ini.get<bool>("sec", "ban") << std::endl;
 
 		ini.set_section("data"); // set current section
@@ -23,7 +22,7 @@ int main()
 		std::cout << "data::x " << ini.get<int>("x") << std::endl; // == ini.get<int>("data", "x")
 		std::cout << "data::length " << ini.get<double>("data", "length") << std::endl;
 		std::cout << "new::val " << ini.get<double>("new", "val") << std::endl;
-		std::cout << "info::autor " << ini.get<string>("info", "autor") << std::endl;
+		std::cout << "info::autor " << ini.get<INIFile::string>("info", "autor") << std::endl;
 
 	}
 	catch (std::out_of_range &e)

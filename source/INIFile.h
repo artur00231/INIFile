@@ -12,6 +12,8 @@
 class INIFile
 {
 public:
+	using string = const std::string&;
+
 	INIFile();
 	~INIFile();
 
