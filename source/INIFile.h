@@ -54,6 +54,15 @@ public:
 
 	bool exist(const std::string&, const std::string&) const;
 
+protected:
+	enum class Type {COMMENT, SECTION, DATA, BLANK};
+	Type getLineType(const std::string & line);
+	std::string getSection(const std::string & line);
+	std::pair<std::string, std::string> getData(const std::string & line);
+
+	char getSpecialCharacter(char cahracter);
+	bool isValidCharacter(char cahracter);
+
 private:
 	std::map<std::string, std::map<std::string, std::string>> _ini_data;
 	std::string _current_section = "Global";
