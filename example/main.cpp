@@ -2,13 +2,25 @@
 
 #include <iostream>
 
+#include "tests.h"
+
+#define TEST false
+
 int main()
 {
-
+#if !TEST
 	INIFile ini;
 
-	ini.read("example.cfg");
-
+	try
+	{
+		ini.read("example.cfg");
+	}
+	catch (std::runtime_error & err)
+	{
+		std::cout << err.what() << std::endl;
+		system("pause >> null");
+		exit(EXIT_FAILURE);
+	}
 	if (!ini.good()) exit(1);
 
 	try {
@@ -43,6 +55,11 @@ int main()
 
 	ini.write(); // == ini.write("example.cfg");
 
+#else
+
+	tests::run_tests();
+
+#endif
 
 	system("pause");
 

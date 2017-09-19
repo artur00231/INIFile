@@ -1,236 +1,433 @@
-#include "INIFile.h"
-#include <regex>
+#include "tests.h"
+#include <cctype>
 
-INIFile::INIFile()
+tests::tests()
 {
 }
 
 
-INIFile::~INIFile()
+tests::~tests()
 {
 }
 
-
-bool INIFile::read(const std::string& name)
+void tests::run_tests()
 {
-	clear();
-
-	_file_name = name;
-
-	std::ifstream input(name);
-	if (!input.good())
-	{
-		_file_name = "";
-		return false;
-	}
-
-	std::string line;
-	std::string current_section = "global";
-
 	try
 	{
-		while (std::getline(input, line))
-		{
-			auto x = getLineType(line);
-
-			if (x == Type::SECTION)
-			{
-				current_section = getSection(line);
-				_ini_data[current_section];
-			}
-
-			if (x == Type::DATA)
-			{
-				auto data = getData(line);
-				_ini_data[current_section][data.first] = data.second;
-			}
-
-		}
+		bool show_partial_result = true;
+		test_section_getter(show_partial_result);
+		test_data_getter(show_partial_result);
 	}
 	catch (...)
 	{
-		input.close();
-
-		_ini_data.clear();
-
-		throw;
+		std::cerr << "\n\n\nException throw\n\n\n";
 	}
-
-	input.close();
-
-	_load = true;
-	return true;
 }
 
-
-void INIFile::set_section(const std::string& section)
+void tests::test_section_getter(bool show)
 {
-	_current_section = section;
+	std::size_t test_passed = 0;
+
+	std::cout << "\nTest 1 start\n\n";
+
+	std::cout << test_out("Test 1.1", show);
+	std::string a = "[ \"nam e \"]";
+	if (getSection(a) == "nam e ")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.2", show);
+	a = "  [  n\\[ame  ]  ";
+	if (getSection(a) == "n[ame")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.3", show);
+	a = "s[name]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.4", show);
+	a = "s [name]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.5", show);
+	a = "[name] s";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.6", show);
+	a = "[name]s";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.7", show);
+	a = "[na me]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.8", show);
+	a = "[na\\eme]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.9", show);
+	a = "[\"name]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.10", show);
+	a = "[name";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.11", show);
+	a = "name]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.12", show);
+	a = "[\"name\"\"fsf\"]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.13", show);
+	a = "[\"na[]me\"]";
+	if (getSection(a) == "na[]me")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.14", show);
+	a = "[na[me]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.15", show);
+	a = "[nam=e]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.16", show);
+	a = "[\"na=me\"]";
+	if (getSection(a) == "na=me")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.17", show);
+	a = "[name]";
+	if (getSection(a) == "name")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.18", show);
+	a = "[]";
+	try {
+		getSection(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.19", show);
+	a = "[name];fsfd";
+	if (getSection(a) == "name")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.20", show);
+	a = "[name] ;fsdf";
+	if (getSection(a) == "name")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 1.21", show);
+	a = "[nam\\\"e]";
+	if (getSection(a) == "nam\"e")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << "Tests passed: " << (float)test_passed / 21 * 100 << "%\n";
+
+	std::cout << "\nTest 1 end\n";
 }
 
-
-bool INIFile::good() const
+void tests::test_data_getter(bool show)
 {
-	return _load;
+	std::size_t test_passed = 0;
+
+	std::cout << "\nTest 2 start\n\n";
+
+	std::string a = "data_name=data";
+	std::pair < std::string, std::string> b;
+
+	std::cout << test_out("Test 2.1", show);
+	a = "data_name=data";
+	b = getData(a);
+	if (b.first == "data_name" && b.second == "data")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.2", show);
+	a = "  data_name  =  data  ";
+	b = getData(a);
+	if (b.first == "data_name" && b.second == "data")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.3", show);
+	a = "data name=data";
+	try {
+		getData(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.4", show);
+	a = "data_name=dat a";
+	try {
+		getData(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.5", show);
+	a = "data=name=data";
+	try {
+		getData(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.6", show);
+	a = "\"data_name=data\"";
+	try {
+		getData(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.7", show);
+	a = "data_n[ame=data";
+	try {
+		getData(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.8", show);
+	a = "dat\"a_name=data";
+	try {
+		getData(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.9", show);
+	a = "data_name=";
+	try {
+		getData(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.10", show);
+	a = "=data";
+	try {
+		getData(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.11", show);
+	a = "=";
+	try {
+		getData(a);
+	}
+	catch (std::runtime_error)
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.12", show);
+	a = "data_name=\"da ta\"";
+	b = getData(a);
+	if (b.first == "data_name" && b.second == "da ta")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.13", show);
+	a = "\"data name\"=data";
+	b = getData(a);
+	if (b.first == "data name" && b.second == "data")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.14", show);
+	a = "\"data name\"=\"da ta\"";
+	b = getData(a);
+	if (b.first == "data name" && b.second == "da ta")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.15", show);
+	a = "data_name=data;asdsad";
+	b = getData(a);
+	if (b.first == "data_name" && b.second == "data")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.16", show);
+	a = "data_name=data ;asdsad";
+	b = getData(a);
+	if (b.first == "data_name" && b.second == "data")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << test_out("Test 2.17", show);
+	a = "data\\\"name=data";
+	b = getData(a);
+	if (b.first == "data\"name" && b.second == "data")
+	{
+		std::cout << test_out("Passed", show);
+		test_passed++;
+	}
+
+	std::cout << "Tests passed: " << (float)test_passed / 17 * 100 << "%\n";
+
+	std::cout << "\nTest 2 end\n";
 }
 
-
-void INIFile::clear()
-{
-	_load = false;
-	_ini_data.clear();
-	_file_name = "";
-	_current_section = "Global";
-}
-
-
-bool INIFile::write()
-{
-	return write(_file_name);
-}
-
-
-bool INIFile::write(std::string name)
-{
-	if (!_load)
-	{
-		return false;
-	}
-
-	if (name != "")
-	{
-		std::ofstream output(name);
-		if (output.good())
-		{
-			for (const auto &x : _ini_data)
-			{
-				output << "[";
-
-				auto section_name = x.first;
-
-				section_name = std::regex_replace(section_name, std::regex("\""), "\\\"");
-
-				if (std::find_if(section_name.begin(), section_name.end(), [](char a) -> bool {
-					return std::isspace(a) ||
-						a == ']' ||
-						a == '[' ||
-						a == '\\' ||
-						a == '=' ||
-						a == '#' ||
-						a == ';'; }) != section_name.end())
-				{
-					output << '\"' << section_name << '\"';
-				}
-				else
-				{
-					output << section_name;
-				}
-
-				output << "]\n";
-
-				for (const auto &a : x.second)
-				{
-
-					auto data_name = a.first;
-
-					data_name = std::regex_replace(data_name, std::regex("\""), "\\\"");
-
-					if (std::find_if(data_name.begin(), data_name.end(), [](char a) -> bool {
-						return std::isspace(a) ||
-							a == ']' ||
-							a == '[' ||
-							a == '\\' ||
-							a == '=' ||
-							a == '#' ||
-							a == ';'; }) != data_name.end())
-					{
-						output << '\"' << data_name << '\"';
-					}
-					else
-					{
-						output << data_name;
-					}
-
-					output << "=" ;
-
-					auto data = a.second;
-
-					data = std::regex_replace(data, std::regex("\""), "\\\"");
-
-					if (std::find_if(data.begin(), data.end(), [](char a) -> bool {
-						return std::isspace(a) ||
-							a == ']' ||
-							a == '[' ||
-							a == '\\' ||
-							a == '=' ||
-							a == '#' ||
-							a == ';'; }) != data.end())
-					{
-						output << '\"' << data << '\"';
-					}
-					else
-					{
-						output << data;
-					}
-
-					output << '\n';
-				}
-			}
-
-			output.close();
-			return true;
-		}
-
-		output.close();
-	}
-	return false;
-}
-
-bool INIFile::exist(const std::string & section, const std::string & property) const
-{
-	if (_ini_data.count(section) == 1)
-	{
-
-		if (_ini_data.at(section).count(property) == 1)
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-INIFile::Type INIFile::getLineType(const std::string & line)
-{
-	char first_non_blank_character = ' ';
-
-	for (auto &x : line)
-	{
-		if (!std::isspace(x))
-		{
-			first_non_blank_character = x;
-			break;
-		}
-	}
-
-	if (first_non_blank_character == ';' || first_non_blank_character == '#')
-	{
-		return Type::COMMENT;
-	}
-
-	if (first_non_blank_character == '[')
-	{
-		return Type::SECTION;
-	}
-
-	if (!std::isspace(first_non_blank_character))
-	{
-		return Type::DATA;
-	}
-
-	return Type::BLANK;
-}
-
-std::string INIFile::getSection(const std::string & line)
+std::string tests::getSection(const std::string & line)
 {
 	enum class Parser_Section { Before, Name, After };
 
@@ -263,7 +460,7 @@ std::string INIFile::getSection(const std::string & line)
 					throw std::runtime_error{ "Unexpected character: " + character };
 				}
 			}
-			break;
+				break;
 
 			case Parser_Section::Name:
 			{
@@ -358,7 +555,7 @@ std::string INIFile::getSection(const std::string & line)
 					section_name += character;
 				}
 			}
-			break;
+				break;
 
 			case Parser_Section::After:
 			{
@@ -373,7 +570,7 @@ std::string INIFile::getSection(const std::string & line)
 					throw std::runtime_error{ "Unexpected character: " + character };
 				}
 			}
-			break;
+				break;
 			default:
 				break;
 			}
@@ -394,7 +591,7 @@ std::string INIFile::getSection(const std::string & line)
 	return section_name;
 }
 
-std::pair<std::string, std::string> INIFile::getData(const std::string & line)
+std::pair<std::string, std::string> tests::getData(const std::string & line)
 {
 	enum class Parser_Section { Before, First_Name, Second_Name, After };
 
@@ -586,7 +783,7 @@ std::pair<std::string, std::string> INIFile::getData(const std::string & line)
 							++i;
 							if (character = getSpecialCharacter(line.at(i)))
 							{
-								data += character;
+								data+= character;
 								continue;
 							}
 							else
@@ -682,7 +879,7 @@ std::pair<std::string, std::string> INIFile::getData(const std::string & line)
 	return { data_name, data };
 }
 
-char INIFile::getSpecialCharacter(char character)
+char tests::getSpecialCharacter(char character)
 {
 	switch (character)
 	{
@@ -720,7 +917,7 @@ char INIFile::getSpecialCharacter(char character)
 	}
 }
 
-bool INIFile::isValidCharacter(char cahracter)
+bool tests::isValidCharacter(char cahracter)
 {
 	return !(
 		cahracter == ']' ||
