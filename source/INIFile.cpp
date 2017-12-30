@@ -83,6 +83,26 @@ void INIFile::clear()
 	_current_section = "Global";
 }
 
+bool INIFile::check(std::vector<std::pair<std::string, std::string>>& names)
+{
+	for (auto && data : names)
+	{
+		if (!_ini_data.count(data.first))
+		{
+			return false;
+		}
+
+		auto map = _ini_data.at(data.first);
+
+		if (!map.count(data.second))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 
 bool INIFile::write()
 {

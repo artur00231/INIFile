@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <exception>
+#include <vector>
 
 #ifndef INIFILE_H
 #define INIFILE_H
@@ -21,6 +22,7 @@ public:
 	void set_section(const std::string&); // set current section
 	bool good() const; // is INIFile ready?
 	void clear(); // claer all INIFile data
+	bool check(std::vector<std::pair<std::string, std::string>> & names); // check if all data is loaded
 
 
 	// get bool/int/long long/double/const std::string& from INIFile
