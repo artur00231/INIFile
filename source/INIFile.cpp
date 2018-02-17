@@ -53,7 +53,8 @@ bool INIFile::read(const std::string& name)
 
 		_ini_data.clear();
 
-		throw;
+		_file_name = "";
+		return false;
 	}
 
 	input.close();
