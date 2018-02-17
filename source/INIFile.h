@@ -16,6 +16,13 @@ public:
 	using string = const std::string&;
 
 	INIFile();
+
+	INIFile(const INIFile&) = delete;
+	INIFile(INIFile&&) = default;
+
+	INIFile& operator=(const INIFile&) = delete;
+	INIFile& operator=(INIFile&&) = default;
+
 	~INIFile();
 
 	bool read(const std::string& name); // read file
@@ -79,7 +86,7 @@ private:
 template<typename T>
 inline T INIFile::get(const std::string&, const std::string&) const
 {
-	static_assert(0, "Incorrect type");
+	static_assert(std::is_same<T, int>, "Incorrect type");
 	return T{};
 }
 
