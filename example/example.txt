@@ -1,0 +1,16 @@
+[data]
+	[[dimensions]]
+	length = 4.5
+	width = 7.6
+		[[[width]]]
+		precision = 5
+[data]
+x = 45
+y = 7
+a = "[data]"
+	[[z]] = { 1 | 7 | 8 | 5 }
+["lib info"]
+autor = artur00231
+ver = 2.0:s
+[ini_file]
+ini_file = "[section]\n a = 1\n b = 6\n c = 45:d"

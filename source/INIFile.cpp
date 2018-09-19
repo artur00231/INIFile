@@ -1,754 +1,439 @@
 #include "INIFile.h"
-#include <regex>
+#include "INIParser.h"
 
-INIFile::INIFile()
+#include <sstream>
+#include <fstream>
+#include <cctype>
+
+
+ini::INIFile::INIFile(INIFileSettings settings) : Section{ nullptr, 0, "global", nullptr }, main_settings{ settings }
 {
+	this->settings = &main_settings;
 }
 
 
-INIFile::~INIFile()
+ini::INIFile::~INIFile()
 {
 }
 
+bool ini::INIFile::load(const std::filesystem::path & path)
+{
+	clear();
+	file_path.reset(new std::filesystem::path{ path });
 
-bool INIFile::read(const std::string& name)
+	ini::INIParser ini_parser;
+	try {
+		auto success = ini_parser.parse(path, *this);
+
+		last_parse_error_log = std::move(ini_parser.getErrorLog());
+
+		return success;
+	}
+	catch (const ini::exception::INIParserException & exception)
+	{
+		throw ini::exception::FileDoesntExist{ exception.what() };
+	}
+}
+
+bool ini::INIFile::load(const std::string & data)
 {
 	clear();
 
-	_file_name = name;
+	ini::INIParser ini_parser;
+	auto success = ini_parser.parse(data, *this);
+	last_parse_error_log = std::move(ini_parser.getErrorLog());
 
-	std::ifstream input(name);
-	if (!input.good())
+	return success;
+}
+
+bool ini::INIFile::load(const char * data)
+{
+	clear();
+
+
+	ini::INIParser ini_parser;
+	auto success = ini_parser.parse(data, *this);
+	last_parse_error_log = std::move(ini_parser.getErrorLog());
+
+	return success;
+}
+
+void saveSection(const ini::Section & section, std::ostream & out, const ini::INIFileSettings & settings);
+
+void ini::INIFile::save(std::string & buffer) const
+{
+	buffer.clear();
+	std::stringstream ss;
+
+	saveSection(*this, ss, main_settings);
+	ss.flush();
+
+	buffer = ss.str();
+}
+
+void ini::INIFile::save(const std::filesystem::path & path) const
+{
+	using namespace std::string_literals;
+
+	std::fstream file{};
+	file.open(path.string(), std::ios_base::out);
+
+	if (!file.good())
 	{
-		_file_name = "";
-		return false;
+		std::string message{ "Cannot open file \""s + path.string() + "\""s };
+		throw exception::FileDoesntExist{ message };
 	}
 
-	std::string line;
-	std::string current_section = "global";
+	saveSection(*this, file, main_settings);
 
-	try
+
+	file.close();
+}
+
+void ini::INIFile::save() const
+{
+	using namespace std::string_literals;
+
+	if (!file_path)
 	{
-		while (std::getline(input, line))
-		{
-			auto x = getLineType(line);
-
-			if (x == Type::SECTION)
-			{
-				current_section = getSection(line);
-				_ini_data[current_section];
-			}
-
-			if (x == Type::DATA)
-			{
-				auto data = getData(line);
-				_ini_data[current_section][data.first] = data.second;
-			}
-
-		}
-	}
-	catch (...)
-	{
-		input.close();
-
-		_ini_data.clear();
-
-		_file_name = "";
-		return false;
+		std::string message{ "Save path is not set"s };
+		throw exception::FileDoesntExist{ message };
 	}
 
-	input.close();
+	save(*file_path);
+}
 
-	_load = true;
-	return true;
+const std::vector<std::string>& ini::INIFile::getLastParseErrorLog() const
+{
+	return last_parse_error_log;
+}
+
+ini::INIFileSettings ini::INIFile::getSettings() const
+{
+	return main_settings;
 }
 
 
-void INIFile::set_section(const std::string& section)
+
+bool isSpecialCharacter(char character);
+
+std::string getNameWithSpecialCharacters(std::string_view name);
+
+bool haveSpecialCharacters(std::string_view text);
+
+void saveProperty(const ini::Property & property, std::ostream & out, bool type_identification);
+
+void saveInlineSection(const ini::Section & section, std::ostream & out);
+
+bool isInlineSection(const ini::Section & section);
+
+struct DataTypeIdentifier
 {
-	_current_section = section;
-}
+	void operator()(int x) { data_type = ini::INIParser::DATA_TYPE::INT; };
+	void operator()(std::string x) { data_type = ini::INIParser::DATA_TYPE::STRING; }
+	void operator()(double x) { data_type = ini::INIParser::DATA_TYPE::DOUBLE; };
+	void operator()(long long x) { data_type = ini::INIParser::DATA_TYPE::LONG; };
+	void operator()(bool x) { data_type = ini::INIParser::DATA_TYPE::BOOL; };
 
+	ini::INIParser::DATA_TYPE data_type{};
+};
 
-bool INIFile::good() const
+bool isSpecialCharacter(char character)
 {
-	return _load;
-}
-
-
-void INIFile::clear()
-{
-	_load = false;
-	_ini_data.clear();
-	_file_name = "";
-	_current_section = "Global";
-}
-
-bool INIFile::check(std::vector<std::pair<std::string, std::string>>& names)
-{
-	for (auto && data : names)
-	{
-		if (!_ini_data.count(data.first))
-		{
-			return false;
-		}
-
-		auto map = _ini_data.at(data.first);
-
-		if (!map.count(data.second))
-		{
-			return false;
-		}
-	}
-
-	return true;
-}
-
-
-bool INIFile::write()
-{
-	return write(_file_name);
-}
-
-
-bool INIFile::write(std::string name)
-{
-	if (!_load)
-	{
-		return false;
-	}
-
-	if (name != "")
-	{
-		std::ofstream output(name);
-		if (output.good())
-		{
-			for (const auto &x : _ini_data)
-			{
-				output << "[";
-
-				auto section_name = x.first;
-
-				section_name = std::regex_replace(section_name, std::regex("\""), "\\\"");
-
-				if (std::find_if(section_name.begin(), section_name.end(), [](char a) -> bool {
-					return std::isspace(a) ||
-						a == ']' ||
-						a == '[' ||
-						a == '\\' ||
-						a == '=' ||
-						a == '#' ||
-						a == ';'; }) != section_name.end())
-				{
-					output << '\"' << section_name << '\"';
-				}
-				else
-				{
-					output << section_name;
-				}
-
-				output << "]\n";
-
-				for (const auto &a : x.second)
-				{
-
-					auto data_name = a.first;
-
-					data_name = std::regex_replace(data_name, std::regex("\""), "\\\"");
-
-					if (std::find_if(data_name.begin(), data_name.end(), [](char a) -> bool {
-						return std::isspace(a) ||
-							a == ']' ||
-							a == '[' ||
-							a == '\\' ||
-							a == '=' ||
-							a == '#' ||
-							a == ';'; }) != data_name.end())
-					{
-						output << '\"' << data_name << '\"';
-					}
-					else
-					{
-						output << data_name;
-					}
-
-					output << "=" ;
-
-					auto data = a.second;
-
-					data = std::regex_replace(data, std::regex("\""), "\\\"");
-
-					if (std::find_if(data.begin(), data.end(), [](char a) -> bool {
-						return std::isspace(a) ||
-							a == ']' ||
-							a == '[' ||
-							a == '\\' ||
-							a == '=' ||
-							a == '#' ||
-							a == ';'; }) != data.end())
-					{
-						output << '\"' << data << '\"';
-					}
-					else
-					{
-						output << data;
-					}
-
-					output << '\n';
-				}
-			}
-
-			output.close();
-			return true;
-		}
-
-		output.close();
-	}
-	return false;
-}
-
-bool INIFile::exist(const std::string & section, const std::string & property) const
-{
-	if (_ini_data.count(section) == 1)
-	{
-
-		if (_ini_data.at(section).count(property) == 1)
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-INIFile::Type INIFile::getLineType(const std::string & line)
-{
-	char first_non_blank_character = ' ';
-
-	for (auto &x : line)
-	{
-		if (!std::isspace(x))
-		{
-			first_non_blank_character = x;
-			break;
-		}
-	}
-
-	if (first_non_blank_character == ';' || first_non_blank_character == '#')
-	{
-		return Type::COMMENT;
-	}
-
-	if (first_non_blank_character == '[')
-	{
-		return Type::SECTION;
-	}
-
-	if (!std::isspace(first_non_blank_character))
-	{
-		return Type::DATA;
-	}
-
-	return Type::BLANK;
-}
-
-std::string INIFile::getSection(const std::string & line)
-{
-	enum class Parser_Section { Before, Name, After };
-
-	Parser_Section parser_section = Parser_Section::Before;
-
-	char character;
-	std::string section_name;
-
-	bool before_word = true;
-	bool after_word = false;
-	bool in_quotation_marks = false;
-
-	try
-	{
-		for (std::string::size_type i = 0; i < line.size(); ++i)
-		{
-			character = line.at(i);
-
-			switch (parser_section)
-			{
-
-			case Parser_Section::Before:
-			{
-				if (character == '[')
-				{
-					parser_section = Parser_Section::Name;
-				}
-				else if (!std::isspace(character))
-				{
-					throw std::runtime_error{ "Unexpected character: " + character };
-				}
-			}
-			break;
-
-			case Parser_Section::Name:
-			{
-				if (isspace(character))
-				{
-					if (in_quotation_marks)
-					{
-						section_name += character;
-					}
-					else
-					{
-						if (!(before_word || after_word))
-						{
-							after_word = true;
-						}
-					}
-				}
-				else
-				{
-					before_word = false;
-
-					if (character == ']' && !in_quotation_marks)
-					{
-						if (section_name.size() == 0)
-						{
-							throw std::runtime_error{ "Unexpected character: " + character };
-						}
-
-						parser_section = Parser_Section::After;
-						continue;
-					}
-
-					if (character == '\"')
-					{
-						if (!in_quotation_marks)
-						{
-							in_quotation_marks = true;
-							before_word = false;
-							continue;
-						}
-						else
-						{
-							in_quotation_marks = false;
-							after_word = true;
-							continue;
-						}
-					}
-
-					if (character == '\\')
-					{
-						if (!in_quotation_marks)
-						{
-							++i;
-							if (character = getSpecialCharacter(line.at(i)))
-							{
-								section_name += character;
-								continue;
-							}
-							else
-							{
-								throw std::runtime_error{ "Unexpected character: " + character };
-							}
-						}
-						else
-						{
-							if (character = getSpecialCharacter(line.at(i + 1)))
-							{
-								if (character == '\"')
-								{
-									i++;
-									section_name += character;
-									continue;
-								}
-								else
-								{
-									character = '\\';
-								}
-							}
-						}
-					}
-
-					if (after_word)
-					{
-						throw std::runtime_error{ "Unexpected character: " + character };
-					}
-
-					if (!in_quotation_marks && !isValidCharacter(character))
-					{
-						throw std::runtime_error{ "Unexpected character: " + character };
-					}
-
-					section_name += character;
-				}
-			}
-			break;
-
-			case Parser_Section::After:
-			{
-				if (!std::isspace(character))
-				{
-					if (character == ';' || character == '#')
-					{
-						i = line.size();
-						continue;
-					}
-
-					throw std::runtime_error{ "Unexpected character: " + character };
-				}
-			}
-			break;
-			default:
-				break;
-			}
-
-
-		}
-	}
-	catch (std::out_of_range & excepion)
-	{
-		throw std::runtime_error{ "Unexpected end of line" };
-	}
-
-	if (parser_section != Parser_Section::After)
-	{
-		throw std::runtime_error{ "Unexpected end of line" };
-	}
-
-	return section_name;
-}
-
-std::pair<std::string, std::string> INIFile::getData(const std::string & line)
-{
-	enum class Parser_Section { Before, First_Name, Second_Name, After };
-
-	Parser_Section parser_section = Parser_Section::Before;
-
-	char character;
-	std::string data_name;
-	std::string data;
-
-	bool before_word = true;
-	bool after_word = false;
-	bool in_quotation_marks = false;
-
-	try
-	{
-		for (std::string::size_type i = 0; i < line.size(); ++i)
-		{
-			character = line.at(i);
-
-			switch (parser_section)
-			{
-
-			case Parser_Section::Before:
-			{
-				if (!std::isspace(character))
-				{
-					parser_section = Parser_Section::First_Name;
-					i--;
-				}
-			}
-			break;
-
-			case Parser_Section::First_Name:
-			{
-				if (isspace(character))
-				{
-					if (in_quotation_marks)
-					{
-						data_name += character;
-					}
-					else
-					{
-						if (!(before_word || after_word))
-						{
-							after_word = true;
-						}
-					}
-				}
-				else
-				{
-					before_word = false;
-
-					if (character == '=' && !in_quotation_marks)
-					{
-						if (data_name.size() == 0)
-						{
-							throw std::runtime_error{ "Unexpected character: " + character };
-						}
-
-						parser_section = Parser_Section::Second_Name;
-						before_word = true;
-						after_word = false;
-						in_quotation_marks = false;
-
-						continue;
-					}
-
-					if (character == '\"')
-					{
-						if (!in_quotation_marks)
-						{
-							in_quotation_marks = true;
-							before_word = false;
-							continue;
-						}
-						else
-						{
-							in_quotation_marks = false;
-							after_word = true;
-							continue;
-						}
-					}
-
-					if (character == '\\')
-					{
-						if (!in_quotation_marks)
-						{
-							++i;
-							if (character = getSpecialCharacter(line.at(i)))
-							{
-								data_name += character;
-								continue;
-							}
-							else
-							{
-								throw std::runtime_error{ "Unexpected character: " + character };
-							}
-						}
-						else
-						{
-							if (character = getSpecialCharacter(line.at(i + 1)))
-							{
-								if (character == '\"')
-								{
-									i++;
-									data_name += character;
-									continue;
-								}
-								else
-								{
-									character = '\\';
-								}
-							}
-						}
-					}
-
-					if (after_word)
-					{
-						throw std::runtime_error{ "Unexpected character: " + character };
-					}
-
-					if (!in_quotation_marks && !isValidCharacter(character))
-					{
-						throw std::runtime_error{ "Unexpected character: " + character };
-					}
-
-					data_name += character;
-				}
-			}
-			break;
-
-			case Parser_Section::Second_Name:
-			{
-				if (isspace(character))
-				{
-					if (in_quotation_marks)
-					{
-						data += character;
-					}
-					else
-					{
-						if (!(before_word || after_word))
-						{
-							if (data.size() == 0)
-							{
-								throw std::runtime_error{ "Unexpected character: " + character };
-							}
-
-							parser_section = Parser_Section::After;
-						}
-					}
-				}
-				else
-				{
-					before_word = false;
-
-
-					if (character == '\"')
-					{
-						if (!in_quotation_marks)
-						{
-							in_quotation_marks = true;
-							before_word = false;
-							continue;
-						}
-						else
-						{
-							in_quotation_marks = false;
-							after_word = true;
-
-							if (i == line.size() - 1)
-							{
-								if (data.size() == 0)
-								{
-									throw std::runtime_error{ "Unexpected end of line" };
-								}
-
-								parser_section = Parser_Section::After;
-							}
-
-							continue;
-						}
-					}
-
-					if (character == '\\')
-					{
-						if (!in_quotation_marks)
-						{
-							++i;
-							if (character = getSpecialCharacter(line.at(i)))
-							{
-								data += character;
-								continue;
-							}
-							else
-							{
-								throw std::runtime_error{ "Unexpected character: " + character };
-							}
-						}
-						else
-						{
-							if (character = getSpecialCharacter(line.at(i + 1)))
-							{
-								if (character == '\"')
-								{
-									i++;
-									data += character;
-									continue;
-								}
-								else
-								{
-									character = '\\';
-								}
-							}
-						}
-					}
-
-					if (after_word)
-					{
-						throw std::runtime_error{ "Unexpected character: " + character };
-					}
-
-					if (!in_quotation_marks && !isValidCharacter(character))
-					{
-						if (character == ';' || character == '#')
-						{
-							parser_section = Parser_Section::After;
-							i--;
-							continue;
-						}
-
-						throw std::runtime_error{ "Unexpected character: " + character };
-					}
-
-					data += character;
-
-					if (i == line.size() - 1)
-					{
-						if (!in_quotation_marks)
-						{
-							if (data.size() == 0)
-							{
-								throw std::runtime_error{ "Unexpected end of line" };
-							}
-
-							parser_section = Parser_Section::After;
-						}
-					}
-				}
-			}
-			break;
-
-			case Parser_Section::After:
-			{
-				if (!std::isspace(character))
-				{
-					if (character == ';' || character == '#')
-					{
-						i = line.size();
-						continue;
-					}
-
-					throw std::runtime_error{ "Unexpected character: " + character };
-				}
-			}
-			break;
-
-			default:
-				break;
-			}
-
-
-		}
-	}
-	catch (std::out_of_range & excepion)
-	{
-		throw std::runtime_error{ "Unexpected end of line" };
-	}
-
-	if (parser_section != Parser_Section::After)
-	{
-		throw std::runtime_error{ "Unexpected end of line" };
-	}
-
-	return { data_name, data };
-}
-
-char INIFile::getSpecialCharacter(char character)
-{
-	switch (character)
-	{
-	case ';':
-		return ';';
-		break;
-
-	case '#':
-		return '#';
-		break;
-
-	case '\\':
-		return '\\';
-		break;
-
-	case '=':
-		return '=';
-		break;
-
-	case '[':
-		return '[';
-		break;
-
-	case ']':
-		return ']';
-		break;
-
-	case '\"':
-		return '\"';
-		break;
-
-	default:
-		return 0;
-		break;
-	}
-}
-
-bool INIFile::isValidCharacter(char cahracter)
-{
-	return !(
-		cahracter == ']' ||
-		cahracter == '[' ||
-		cahracter == '\\' ||
-		cahracter == '=' ||
-		cahracter == '#' ||
-		cahracter == ';'
+	return (
+		character == ']' ||
+		character == '[' ||
+		character == '{' ||
+		character == '}' ||
+		character == '\\' ||
+		character == '\"' ||
+		character == '=' ||
+		character == ':' ||
+		character == '#' ||
+		character == ';' ||
+		character == '|' ||
+		character == ':' ||
+		character == '\n' ||
+		character == '\t'
 		);
+}
+
+std::string getNameWithSpecialCharacters(std::string_view name) 
+{
+	std::string name_with_special_characters{};
+	for (auto && character : name) // ", \n and \t have to be save as a special character
+	{
+		switch (character)
+		{
+		case '\"':
+			name_with_special_characters.append("\\\"");
+			break;
+
+		case '\n':
+			name_with_special_characters.append("\\n");
+			break;
+
+		case '\t':
+			name_with_special_characters.append("\\t");
+			break;
+
+		default:
+			name_with_special_characters += character;
+			break;
+		}
+	}
+
+	return name_with_special_characters;
+}
+
+bool haveSpectianCharacters(std::string_view text)
+{
+	for (auto && x : text)
+	{
+		if (std::isspace(static_cast<unsigned char>(x))
+			|| isSpecialCharacter(x)
+			)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void saveSection(const ini::Section & section, std::ostream & out, const ini::INIFileSettings & settings)
+{
+	if (section.getLevel() != 0)
+	{
+		if (settings.inline_section)
+		{
+			if (isInlineSection(section))
+			{
+				if (settings.advanced_save_layout) { out << std::string(section.getLevel() - 1, '\t'); }
+
+				saveInlineSection(section, out);
+
+				return;
+			}
+		}
+
+		std::string opening_brackets(section.getLevel(), '[');
+		std::string closing_brackets(section.getLevel(), ']');
+
+		if (!haveSpectianCharacters(section.getName()))
+		{
+			if (settings.advanced_save_layout) { out << std::string(section.getLevel() - 1, '\t'); }
+			out << opening_brackets << section.getName() << closing_brackets << "\n";
+		}
+		else
+		{
+			auto section_name = getNameWithSpecialCharacters(section.getName());
+
+			out << opening_brackets << '\"' << section_name << '\"' << closing_brackets << "\n";
+		}
+	}
+
+	for (auto && x : section)
+	{
+		if (settings.advanced_save_layout) { 
+			auto level = (section.getLevel() ? section.getLevel() - 1: section.getLevel()); // Do not subtract if level is equal to 0
+			out << std::string(section.getLevel() - 1, '\t');
+		}
+		saveProperty(x, out, settings.type_identification);
+	}
+
+	for (auto it = ini::const_SectionIterator{ section }; it != ini::const_SectionIterator{}; it++)
+	{
+		saveSection(*it, out, settings);
+	}
+}
+
+void saveProperty(const ini::Property & property, std::ostream & out, bool type_identification)
+{
+	if (!haveSpectianCharacters(property.getName()))
+	{
+		out << property.getName() << " = ";
+	}
+	else
+	{
+		std::string property_name = getNameWithSpecialCharacters(property.getName());
+
+		out << '\"' << property_name << "\" = ";
+	}
+
+	auto property_value = property.get<std::string>();
+
+	if (!haveSpectianCharacters(property_value))
+	{
+		out << property_value;
+	}
+	else
+	{
+		property_value = getNameWithSpecialCharacters(property_value);
+
+		out << '\"' << property_value << '\"';
+	}
+
+	if (type_identification)
+	{
+		ini::INIParser ini_parser;
+		DataTypeIdentifier data_type_indentifier{};
+		property.visit(data_type_indentifier);
+
+		if (ini_parser.getDataType(property_value) != data_type_indentifier.data_type) // If parser incorrectly deduce the proerty type, save a proper type
+		{
+			out << ":";
+
+			switch (data_type_indentifier.data_type)
+			{
+			case ini::INIParser::DATA_TYPE::INT:
+				out << 'i';
+				break;
+
+			case ini::INIParser::DATA_TYPE::BOOL:
+				out << 'b';
+				break;
+
+			case ini::INIParser::DATA_TYPE::LONG:
+				out << 'l';
+				break;
+
+			case ini::INIParser::DATA_TYPE::DOUBLE:
+				out << 'd';
+				break;
+
+			case ini::INIParser::DATA_TYPE::STRING:
+				out << 's';
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	out << "\n";
+}
+
+void saveInlineSection(const ini::Section & section, std::ostream & out)
+{
+	std::string opening_brackets(section.getLevel(), '[');
+	std::string closing_brackets(section.getLevel(), ']');
+
+	if (!haveSpectianCharacters(section.getName()))
+	{
+		out << opening_brackets << section.getName() << closing_brackets << " = { ";
+	}
+	else
+	{
+		auto section_name = getNameWithSpecialCharacters(section.getName());
+
+		out << '\"' << opening_brackets << section.getName() << closing_brackets << "\" = { ";
+	}
+
+	std::vector<ini::Property> properties{ section.begin(), section.end() };
+
+	std::sort(properties.begin(), properties.end(), [](const ini::Property & p1, const ini::Property & p2){
+		return std::stoul(p1.getName()) < std::stoul(p2.getName());
+	});
+
+	for (auto property = properties.begin(); property != properties.end(); property++)
+	{
+		if (property != properties.begin())
+		{
+			out << " | ";
+		}
+
+		auto property_value = property->get<std::string>();
+
+		if (!haveSpectianCharacters(property_value))
+		{
+			out << property_value;
+		}
+		else
+		{
+			property_value = getNameWithSpecialCharacters(property_value);
+
+			out << '\"' << property_value << '\"';
+		}
+
+		ini::INIParser ini_parser;
+		DataTypeIdentifier data_type_indentifier{};
+		property->visit(data_type_indentifier);
+
+		if (ini_parser.getDataType(property_value) != data_type_indentifier.data_type) // If parser incorrectly deduce the proerty type, save a proper type
+		{
+			out << ":";
+
+			switch (data_type_indentifier.data_type)
+			{
+			case ini::INIParser::DATA_TYPE::INT:
+				out << 'i';
+				break;
+
+			case ini::INIParser::DATA_TYPE::BOOL:
+				out << 'b';
+				break;
+
+			case ini::INIParser::DATA_TYPE::LONG:
+				out << 'l';
+				break;
+
+			case ini::INIParser::DATA_TYPE::DOUBLE:
+				out << 'd';
+				break;
+
+			case ini::INIParser::DATA_TYPE::STRING:
+				out << 's';
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	out << " }\n";
+}
+
+bool isInlineSection(const ini::Section & section)
+{
+	std::vector<std::size_t> numbers{};
+
+	if (ini::const_SectionIterator{ section } != ini::const_SectionIterator{})
+	{
+		return false;
+	}
+
+	for (auto && property : section)
+	{
+		auto name = property.getName();
+
+		if (std::count_if(name.begin(), name.end(), std::isdigit) != name.size())
+		{
+			return false;
+		}
+
+		numbers.emplace_back(static_cast<std::size_t>(std::stoul(name)));
+	}
+
+	if (numbers.empty())
+	{
+		return false;
+	}
+
+	std::sort(numbers.begin(), numbers.end());
+
+	if (numbers.front() != 0)
+	{
+		return false;
+	}
+
+	for (auto it = numbers.begin() + 1; it != numbers.end(); it++)
+	{
+		if (*(it - 1) != *it - 1)
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
