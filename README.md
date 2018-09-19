@@ -1,2 +1,2 @@
 # INIFile
-Simple c++ ini file reader
+Modern c++ library to load, manipulate and save ini files
