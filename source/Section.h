@@ -67,7 +67,7 @@ namespace ini
 		std::string getProperName(std::string_view name) const;
 
 
-		const INIFileSettings * settings; // settings must be propected, becouse INIFile have to modified it
+		const INIFileSettings * settings; // settings must be protected, becouse INIFile have to modified it
 	private:
 		std::unordered_map<std::string, Section> sections;
 		std::unordered_map<std::string, Property> propertes;

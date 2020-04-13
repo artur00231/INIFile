@@ -108,7 +108,7 @@ inline T ini::Property::get() const
 	catch ([[maybe_unused]] const std::invalid_argument & exception)
 	{
 		std::string message = "Conversion to: \""s + typeid(T).name();
-		throw exception::PropertyConversionError{ message };
+		throw typename exception::PropertyConversionError{ message };
 	}
 
 }

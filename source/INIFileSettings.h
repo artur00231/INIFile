@@ -32,7 +32,7 @@ namespace ini
 		INIFileSettings& operator=(INIFileSettings&&) = default;
 
 		bool case_sensitivity{ true };
-		bool inline_section{ true }; // Enable array like section definition // TODO
+		bool inline_section{ true }; // Enable array like section definition
 		bool type_identification{ true }; // Automatically cast property value
 		bool advanced_save_layout{ true }; // Add tabulators to show level of nesting
 
