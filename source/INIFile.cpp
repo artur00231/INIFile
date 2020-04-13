@@ -237,7 +237,7 @@ void saveSection(const ini::Section & section, std::ostream & out, const ini::IN
 	{
 		if (settings.advanced_save_layout) { 
 			auto level = (section.getLevel() ? section.getLevel() - 1: section.getLevel()); // Do not subtract if level is equal to 0
-			out << std::string(section.getLevel() - 1, '\t');
+			out << std::string(level, '\t');
 		}
 		saveProperty(x, out, settings.type_identification);
 	}
