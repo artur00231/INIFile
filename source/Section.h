@@ -100,21 +100,21 @@ namespace ini
 		property_name = getProperName(property_name);
 
 		Property property{ property_name };
-
-																			// Every possible type, but std::string
-		if constexpr (helper_functions::can_by_converted_to_string_v<T>)	// Invalid types will trigger assertion in ini::Property::set
+				
+		if constexpr (!std::is_same_v<std::remove_cvref_t<T>, std::string> &&	// Every possible type, but std::string
+			helper_functions::can_by_converted_to_string_v<T>)					// Invalid types will trigger assertion in ini::Property::set
 		{
 			if (!settings->type_identification)
 			{
 				auto property_value = std::to_string(val);
 
-				property.set(std::move(property_value));
+				property.set<std::string&&>(std::move(property_value));
 				addProperty(property);
 				return propertes.at(property_name);
 			}
 		}
 
-		property.set<T>(std::forward<T>(val)); 
+		property.set<>(val);
 
 		addProperty(property);
 		return propertes.at(property_name);

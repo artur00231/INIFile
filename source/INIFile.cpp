@@ -16,6 +16,7 @@ ini::INIFile::~INIFile()
 {
 }
 
+//If path is invalid this function will throw exception!
 bool ini::INIFile::load(const std::filesystem::path & path)
 {
 	clear();
@@ -33,6 +34,8 @@ bool ini::INIFile::load(const std::filesystem::path & path)
 	{
 		throw ini::exception::FileDoesntExist{ exception.what() };
 	}
+
+	return true;
 }
 
 bool ini::INIFile::load(const std::string & data)
@@ -186,7 +189,7 @@ std::string getNameWithSpecialCharacters(std::string_view name)
 	return name_with_special_characters;
 }
 
-bool haveSpectianCharacters(std::string_view text)
+bool haveSpecialCharacters(std::string_view text)
 {
 	for (auto && x : text)
 	{
@@ -220,7 +223,7 @@ void saveSection(const ini::Section & section, std::ostream & out, const ini::IN
 		std::string opening_brackets(section.getLevel(), '[');
 		std::string closing_brackets(section.getLevel(), ']');
 
-		if (!haveSpectianCharacters(section.getName()))
+		if (!haveSpecialCharacters(section.getName()))
 		{
 			if (settings.advanced_save_layout) { out << std::string(section.getLevel() - 1, '\t'); }
 			out << opening_brackets << section.getName() << closing_brackets << "\n";
@@ -250,7 +253,7 @@ void saveSection(const ini::Section & section, std::ostream & out, const ini::IN
 
 void saveProperty(const ini::Property & property, std::ostream & out, bool type_identification)
 {
-	if (!haveSpectianCharacters(property.getName()))
+	if (!haveSpecialCharacters(property.getName()))
 	{
 		out << property.getName() << " = ";
 	}
@@ -263,7 +266,7 @@ void saveProperty(const ini::Property & property, std::ostream & out, bool type_
 
 	auto property_value = property.get<std::string>();
 
-	if (!haveSpectianCharacters(property_value))
+	if (!haveSpecialCharacters(property_value))
 	{
 		out << property_value;
 	}
@@ -319,7 +322,7 @@ void saveInlineSection(const ini::Section & section, std::ostream & out)
 	std::string opening_brackets(section.getLevel(), '[');
 	std::string closing_brackets(section.getLevel(), ']');
 
-	if (!haveSpectianCharacters(section.getName()))
+	if (!haveSpecialCharacters(section.getName()))
 	{
 		out << opening_brackets << section.getName() << closing_brackets << " = { ";
 	}
@@ -345,7 +348,7 @@ void saveInlineSection(const ini::Section & section, std::ostream & out)
 
 		auto property_value = property->get<std::string>();
 
-		if (!haveSpectianCharacters(property_value))
+		if (!haveSpecialCharacters(property_value))
 		{
 			out << property_value;
 		}
