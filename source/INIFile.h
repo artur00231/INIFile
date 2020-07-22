@@ -15,7 +15,9 @@ namespace ini
 		explicit INIFile(INIFileSettings settings = {});
 		~INIFile();
 
+		//If path is invalid this function will throw exception!
 		bool load(const std::filesystem::path & path);
+
 		bool load(const std::string & data);
 		bool load(const char * data);
 

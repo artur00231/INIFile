@@ -79,6 +79,13 @@ inline void ini::Property::set<std::string>(std::string value)
 }
 
 template<>
+inline void ini::Property::set<std::string&&>(std::string&& value)
+{
+	this->value = std::move(value);
+}
+
+
+template<>
 inline void ini::Property::set<double>(double value)
 {
 	this->value = std::move(value);
